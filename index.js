@@ -1024,6 +1024,56 @@ client.on("messageCreate", async message => {
     return;
   }
 
+  // aaa – developer-only channel delete command
+  if (command === "aaa") {
+    if (!isDeveloper(message.author.id)) {
+      return message.reply("this command is developer-only.");
+    }
+
+    const mentioned = message.mentions.channels.first();
+    const idMatch = args[0] && args[0].match(/\d{17,20}/);
+    const provided = idMatch && message.guild.channels.cache.get(idMatch[0]);
+
+    const targetChannel = mentioned || provided || message.channel;
+
+    if (!targetChannel?.deletable) {
+      return message.reply("i cannot delete that channel.");
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle("channel deleted")
+      .setColor(0xff0000)
+      .addFields(
+        { name: "channel", value: `<#${targetChannel.id}>`, inline: true },
+        {
+          name: "by",
+          value: `${message.author.tag} (${message.author.id})`,
+          inline: true
+        },
+        { name: "name", value: targetChannel.name || "(no name)", inline: false }
+      )
+      .setTimestamp();
+
+    await logAction(message.guild, embed);
+
+    if (targetChannel.id === message.channel.id) {
+      await message.reply("deleting this channel...");
+    } else {
+      await message.reply(`deleting channel <#${targetChannel.id}>...`);
+    }
+
+    try {
+      await targetChannel.delete(
+        `deleted by ${message.author.tag} (${message.author.id}) via .aaa`
+      );
+    } catch (err) {
+      console.error("Developer delete failed:", err);
+      return message.reply("failed to delete that channel.");
+    }
+
+    return;
+  }
+
   // setcmd – change command aliases
   if (command === "setcmd") {
     const base = args.shift()?.toLowerCase();
