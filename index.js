@@ -261,13 +261,13 @@ async function getTicketPanelMessage(channel) {
   }
 }
 
-// close & delete a ticket channel
+// close & delete a channel
 async function closeTicketChannel(channel, closedByUser, reasonText) {
   if (!channel || !channel.guild) return;
   clearTicketState(channel.id);
 
   const embed = new EmbedBuilder()
-    .setTitle("ticket closed by staff")
+    .setTitle("channel closed by staff")
     .setColor(0x2b2d31)
     .addFields(
       { name: "channel", value: `${channel.name} (${channel.id})`, inline: true },
@@ -604,7 +604,7 @@ function buildHelpEmbed(page) {
           "**useless** – move a channel into the main ticket category.",
           "**important** – move channel into the important category.",
           "**pingtickets** – ping the ticket opener in all active ticket channels.",
-          "**done** – deletes the current ticket channel.",
+          "**done** – deletes the current channel.",
           "",
           "tickets auto:",
           "- send the line embed with countdown and $100m+ instructions",
@@ -1573,15 +1573,7 @@ client.on("messageCreate", async message => {
   if (command === "done") {
     const channel = message.channel;
 
-    // only allowed inside ticket categories
-    if (
-      !channel.parentId ||
-      !settings.ticketCategories.includes(channel.parentId)
-    ) {
-      return message.reply("this command can only be used inside a ticket.");
-    }
-
-    await channel.send("closing ticket...");
+    await channel.send("closing channel...");
     await closeTicketChannel(channel, message.author, null);
     return;
   }
