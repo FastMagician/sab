@@ -384,7 +384,7 @@ function buildTicketEmbed(remainingMs) {
   ];
 
   return new EmbedBuilder()
-    .setTitle("**RULES** READ BEFORE DOING ANYTHING ELSE")
+    .setTitle("RULES, READ BEFORE DOING ANYTHING ELSE")
     .setDescription(lines.join("\n"))
     .setColor(0x2b2d31);
 }
