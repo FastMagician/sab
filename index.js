@@ -36,6 +36,7 @@ const DEFAULT_ALIASES = {
   important: "important",
   done: "done",
   hi: "hi",
+  pingtickets: "pingtickets",
   help: "help",
   setlogs: "setlogs",
   pingrole: "pingrole",
@@ -383,7 +384,7 @@ function buildTicketEmbed(remainingMs) {
   ];
 
   return new EmbedBuilder()
-    .setTitle("you are now in line")
+    .setTitle("**RULES** READ BEFORE DOING ANYTHING ELSE")
     .setDescription(lines.join("\n"))
     .setColor(0x2b2d31);
 }
@@ -602,6 +603,7 @@ function buildHelpEmbed(page) {
           "**panel** – send ticket panel embed with button. if a category is given, tickets go there.",
           "**useless** – move a channel into the main ticket category.",
           "**important** – move channel into the important category.",
+          "**pingtickets** – ping the ticket opener in all active ticket channels.",
           "**done** – deletes the current ticket channel.",
           "",
           "tickets auto:",
@@ -1582,6 +1584,50 @@ client.on("messageCreate", async message => {
     await channel.send("closing ticket...");
     await closeTicketChannel(channel, message.author, null);
     return;
+  }
+
+  // pingtickets – ping ticket owners in all active tickets
+  if (command === "pingtickets") {
+    const entries = Array.from(ticketOwners.entries());
+
+    if (!entries.length) {
+      return message.reply("there are no active tickets to ping.");
+    }
+
+    let pingedCount = 0;
+
+    for (const [channelId, ownerId] of entries) {
+      let channel;
+
+      try {
+        channel = await message.guild.channels.fetch(channelId);
+      } catch {
+        continue;
+      }
+
+      if (
+        !channel ||
+        channel.deleted ||
+        channel.type !== ChannelType.GuildText ||
+        channel.guild.id !== message.guild.id
+      ) {
+        continue;
+      }
+
+      try {
+        await channel.send(`<@${ownerId}>`);
+        pingedCount++;
+      } catch (err) {
+        console.error("Failed to ping ticket owner:", err);
+      }
+    }
+
+    if (pingedCount === 0) {
+      return message.reply("no ticket owners could be pinged.");
+    }
+
+    const plural = pingedCount === 1 ? "" : "s";
+    return message.reply(`pinged ${pingedCount} ticket owner${plural}.`);
   }
 
   // hi – rename channel from replied message
