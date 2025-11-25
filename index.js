@@ -1523,7 +1523,6 @@ client.on("messageCreate", async message => {
     }
 
     const oldParent = target.parent;
-    clearTicketState(target.id);
 
     try {
       await target.setParent(category.id, { lockPermissions: false });
@@ -1597,7 +1596,6 @@ client.on("messageCreate", async message => {
     }
 
     const oldParent = target.parent;
-    clearTicketState(target.id);
 
     try {
       await target.setParent(importantCat.id, { lockPermissions: false });
