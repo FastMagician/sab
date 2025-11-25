@@ -35,6 +35,7 @@ const DEFAULT_ALIASES = {
   useless: "useless",
   important: "important",
   done: "done",
+  nuke: "nuke",
   hi: "hi",
   pingtickets: "pingtickets",
   help: "help",
@@ -617,6 +618,7 @@ function buildHelpEmbed(page) {
           "**important** – move channel into the important category.",
           "**pingtickets** – ping the ticket opener in all active ticket channels.",
           "**done** – deletes the current channel.",
+          "**nuke** – clone the current channel, delete the old one, and continue here.",
           "",
           "tickets auto:",
           "- send the line embed with countdown and $100m+ instructions",
@@ -1627,6 +1629,59 @@ client.on("messageCreate", async message => {
     } catch (err) {
       console.error("Move error (important):", err);
       return message.reply("i could not move that channel to important.");
+    }
+
+    return;
+  }
+
+  // nuke – clone current channel, delete old channel, say done in new one
+  if (command === "nuke") {
+    const channel = message.channel;
+    const reason = `nuked by ${message.author.tag} (${message.author.id})`;
+    const isTicketChannel =
+      channel.parentId && settings.ticketCategories.includes(channel.parentId);
+
+    let newChannel;
+    try {
+      newChannel = await channel.clone({ name: channel.name, reason });
+      if (channel.parentId) {
+        await newChannel.setParent(channel.parentId, { lockPermissions: false });
+      }
+      await newChannel.setPosition(channel.position);
+    } catch (err) {
+      console.error("Nuke clone failed:", err);
+      return message.reply("i couldn't clone this channel.");
+    }
+
+    const ownerId = ticketOwners.get(channel.id);
+    const claimId = ticketClaims.get(channel.id);
+
+    clearTicketState(channel.id);
+
+    if (ownerId) {
+      ticketOwners.set(newChannel.id, ownerId);
+      activeTickets.set(ownerId, newChannel.id);
+    }
+    if (claimId) {
+      ticketClaims.set(newChannel.id, claimId);
+    }
+
+    if (isTicketChannel) {
+      await startTicketFlowForChannel(newChannel);
+    }
+
+    try {
+      await channel.delete(`${reason} via .nuke`);
+    } catch (err) {
+      console.error("Nuke delete failed:", err);
+      await newChannel.send("new channel created, but i couldn't delete the old one.");
+      return;
+    }
+
+    try {
+      await newChannel.send("done");
+    } catch (err) {
+      console.error("Failed to send nuke confirmation:", err);
     }
 
     return;
