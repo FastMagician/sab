@@ -45,6 +45,7 @@ const DEFAULT_ALIASES = {
   sendcategory: "sendcategory",
   delayset: "delayset",
   admin: "admin",
+  blacklist: "blacklist",
   setcmd: "setcmd",
   setticketcategory: "setticketcategory"
 };
@@ -62,6 +63,7 @@ let settings = {
   autoDelaySeconds: 0,
   notifyRoleId: null,
   ticketCounter: 659,
+  blacklist: [],
   commandAliases: { ...DEFAULT_ALIASES }
 };
 
@@ -108,12 +110,21 @@ if (!settings.commandAliases) {
   }
 }
 
+if (!Array.isArray(settings.blacklist)) {
+  settings.blacklist = [];
+}
+
 // admins (plus devs)
 const adminSet = new Set(settings.admins || []);
 for (const id of DEVELOPER_IDS) adminSet.add(id);
 
+// blacklist cache
+const blacklist = new Set(settings.blacklist || []);
+
 // save settings helper
 function saveSettings() {
+  settings.blacklist = Array.from(blacklist);
+
   const toSave = {
     categoryId: settings.categoryId,
     ticketCategories: settings.ticketCategories,
@@ -129,6 +140,7 @@ function saveSettings() {
         : 0,
     notifyRoleId: settings.notifyRoleId || null,
     ticketCounter: settings.ticketCounter || 659,
+    blacklist: settings.blacklist,
     commandAliases: settings.commandAliases || { ...DEFAULT_ALIASES }
   };
   fs.writeFileSync(settingsPath, JSON.stringify(toSave, null, 2), "utf8");
@@ -621,7 +633,8 @@ function buildHelpEmbed(page) {
           "**admin importantcategory <category>** – set important category.",
           "**setticketcategory <category>** – shortcut to set main ticket category.",
           "**setlogs <channel>** – set logs channel.",
-          "**pingrole <role>** – set staff role to ping (and used for KING role mention)."
+          "**pingrole <role>** – set staff role to ping (and used for KING role mention).",
+          "**blacklist <user>** – block a user from opening tickets (add remove/list)."
         ].join("\n")
       );
   } else {
@@ -712,6 +725,13 @@ client.on("interactionCreate", async interaction => {
   // ticket open button
   if (interaction.customId === "open_ticket") {
     if (!guild) return;
+
+    if (blacklist.has(user.id)) {
+      return interaction.reply({
+        content: "you are blacklisted from creating tickets.",
+        ephemeral: true
+      });
+    }
 
     // 1 ticket per user check (for currently open tickets)
     if (activeTickets.has(user.id)) {
@@ -1182,6 +1202,51 @@ client.on("messageCreate", async message => {
     }
 
     return message.reply("unknown .admin subcommand.");
+  }
+
+  // blacklist – block a user from opening tickets via the panel
+  if (command === "blacklist") {
+    const sub = args[0]?.toLowerCase();
+
+    if (sub === "list") {
+      if (!blacklist.size) {
+        return message.reply("no users are currently blacklisted.");
+      }
+
+      const lines = Array.from(blacklist).map(id => `- <@${id}> (${id})`);
+      return message.reply("blacklisted users:\n" + lines.join("\n"));
+    }
+
+    const isRemoval = ["remove", "unblacklist", "unblock"].includes(sub);
+    if (isRemoval) args.shift();
+
+    const target =
+      message.mentions.users.first() ||
+      (args[0] && (await client.users.fetch(args[0]).catch(() => null)));
+
+    if (!target) {
+      return message.reply("tag a user or give a valid user id.");
+    }
+
+    if (isRemoval) {
+      if (!blacklist.has(target.id)) {
+        return message.reply(`${target.tag} is not blacklisted.`);
+      }
+
+      blacklist.delete(target.id);
+      saveSettings();
+      return message.reply(`${target.tag} has been removed from the blacklist.`);
+    }
+
+    if (blacklist.has(target.id)) {
+      return message.reply(`${target.tag} is already blacklisted.`);
+    }
+
+    blacklist.add(target.id);
+    saveSettings();
+    return message.reply(
+      `${target.tag} has been blacklisted from creating tickets via the panel.`
+    );
   }
 
   // setticketcategory – shortcut for setting main ticket category
